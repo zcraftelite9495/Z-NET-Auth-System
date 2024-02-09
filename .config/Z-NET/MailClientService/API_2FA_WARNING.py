@@ -51,19 +51,19 @@ def twofa_warning():
   # The file token.json stores the user's access and refresh tokens, and is
   # created automatically when the authorization flow completes for the first
   # time.
-  if os.path.exists("/home/zcraftelite/.config/Z-NET/MailClientService/token.json"):
-    creds = Credentials.from_authorized_user_file("/home/zcraftelite/.config/Z-NET/MailClientService/token.json", SCOPES)
+  if os.path.exists("/home/[profile]/.config/Z-NET/MailClientService/token.json"):
+    creds = Credentials.from_authorized_user_file("/home/[profile]/.config/Z-NET/MailClientService/token.json", SCOPES)
   # If there are no (valid) credentials available, let the user log in.
   if not creds or not creds.valid:
     if creds and creds.expired and creds.refresh_token:
       creds.refresh(Request())
     else:
       flow = InstalledAppFlow.from_client_secrets_file(
-          "/home/zcraftelite/.config/Z-NET/MailClientService/credentials.json", SCOPES
+          "/home/[profile]/.config/Z-NET/MailClientService/credentials.json", SCOPES
       )
       creds = flow.run_local_server(port=0)
     # Save the credentials for the next run
-    with open("/home/zcraftelite/.config/Z-NET/MailClientService/token.json", "w") as token:
+    with open("/home/[profile]/.config/Z-NET/MailClientService/token.json", "w") as token:
       token.write(creds.to_json())
 
   try:
@@ -73,7 +73,7 @@ def twofa_warning():
     message.set_content("Z-NET Authentication System Warning: " + USER + msg_prefix + ApplicationName + " using " + twofa_auth_type + ".") 
 
     message["To"] = alertmail
-    message["From"] = "z3na.net@gmail.com"
+    message["From"] = "outgoing-email@example.com"
     message["Subject"] = "Z-NET"
 
     # encoded message
@@ -98,19 +98,19 @@ def verification_code_twofa():
   # The file token.json stores the user's access and refresh tokens, and is
   # created automatically when the authorization flow completes for the first
   # time.
-  if os.path.exists("/home/zcraftelite/.config/Z-NET/MailClientService/token.json"):
-    creds = Credentials.from_authorized_user_file("/home/zcraftelite/.config/Z-NET/MailClientService/token.json", SCOPES)
+  if os.path.exists("/home/[profile]/.config/Z-NET/MailClientService/token.json"):
+    creds = Credentials.from_authorized_user_file("/home/[profile]/.config/Z-NET/MailClientService/token.json", SCOPES)
   # If there are no (valid) credentials available, let the user log in.
   if not creds or not creds.valid:
     if creds and creds.expired and creds.refresh_token:
       creds.refresh(Request())
     else:
       flow = InstalledAppFlow.from_client_secrets_file(
-          "/home/zcraftelite/.config/Z-NET/MailClientService/credentials.json", SCOPES
+          "/home/[profile]/.config/Z-NET/MailClientService/credentials.json", SCOPES
       )
       creds = flow.run_local_server(port=0)
     # Save the credentials for the next run
-    with open("/home/zcraftelite/.config/Z-NET/MailClientService/token.json", "w") as token:
+    with open("/home/[profile]/.config/Z-NET/MailClientService/token.json", "w") as token:
       token.write(creds.to_json())
 
   try:
@@ -120,7 +120,7 @@ def verification_code_twofa():
     message.set_content("Z-NET Verification Code: " + "Your verification code for " + ApplicationName + " is " + twofa_code + ", do not share this code with anyone else.") 
 
     message["To"] = reciever
-    message["From"] = "z3na.net@gmail.com"
+    message["From"] = "outgoing-email@example.com"
     message["Subject"] = "Z-NET Verification"
 
     # encoded message
@@ -141,19 +141,19 @@ def verification_code_twofa():
   return send_message
 
 if TYPE == "app":
-  alertmail = "7574080814@mypixmessages.com"
+  alertmail = "phone-mms-email@example.com"
   twofa_warning()
-  alertmail = "zcomer4dthesecond@gmail.com"
+  alertmail = "first-email@example.com"
   twofa_warning()
 elif TYPE == "failure":
-  alertmail = "7574080814@mypixmessages.com"
+  alertmail = "phone-mms-email@example.com"
   twofa_warning()
-  alertmail = "zcomer4dthesecond@gmail.com"
+  alertmail = "first-email@example.com"
   twofa_warning()
 elif TYPE == "cancelation":
-  alertmail = "7574080814@mypixmessages.com"
+  alertmail = "phone-mms-email@example.com"
   twofa_warning()
-  alertmail = "zcomer4dthesecond@gmail.com"
+  alertmail = "first-email@example.com"
   twofa_warning()
 elif TYPE == "verify":
   verification_code_twofa()
