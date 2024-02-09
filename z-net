@@ -1,0 +1,552 @@
+#!/bin/bash
+
+### Variables
+
+## Program Info
+# Defines the program info
+Program_Version="1.0.69"
+
+## Command List
+# Defines the names of all the available commands
+cmd_list=("update" "help" "auth" "otg")
+
+### Functions/Commands
+
+##- Core Functionality
+
+function protect
+{
+    trap echo SIGINT
+
+    ApplicationName="$cmd_operator_2"
+
+    if [ "$protect_self" == "TRUE" ]; then
+        ApplicationName="Z-NET Command Line Interface"
+    fi
+
+    if [ "$cmd_operator_1" == "" ] || [ "$cmd_operator_1" == "app" ]; then
+        twofa_method=$(dialog --title "Z-NET Two-Factor Authentication System" --menu "This app ($ApplicationName) is protected by Z-NET\nPlease choose a Two-Step Verification Method Below\nAll Two-Step Verification Activity will be monitored" 19 60 10 1 "Use a TOTP Code from your Autehnticator App" 2 "Use a backup code" 3 "Use a trusted bluetooth device" 4 "Use a Trusted USB Device" 5 "Text (757) 408-0814" 6 "Email zcomer4dthesecond@gmail.com" 7 "Email ashtynwheeler101@gmail.com" 8 "Scan your Fingerprint (Unavailable)" 9 "Use your Face ID (Unavailable)" --output-fd 1)
+        clear
+        twofa_state=$?
+        twofa_insecure_pin="091223"
+        if [ "$twofa_state" != "1" ]; then
+
+            if [ "$twofa_method" == "1" ]; then
+                twofa_method_name="TOTP Code"
+                twofa_entry_name="TOTP Code"
+                twofa_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with a TOTP Code from your Authenticator App\n\nPlease enter your TOTP Code" 12 60 --output-fd 1)
+                clear
+                if [ "$twofa_answer" = "$(mintotp <<< ZENAASDNJKLMPONU)" ]; then
+                    twofa_success="TRUE"
+                    echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                    /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                fi
+
+            elif [ "$twofa_method" == "2" ]; then
+                twofa_method_name="Backup Code"
+                twofa_entry_name="Backup Code"
+                twofa_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with a Backup Code\n\nPlease enter your Backup Code" 12 60 --output-fd 1)
+                if [ "$twofa_answer" = "B@ckupC0d3" ]; then
+                    length=${#twofa_answer}
+                    twofa_answer=$(printf '*%.0s' $(seq 1 $length))
+                    twofa_success="TRUE"
+                    sleep 2
+                    echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                    /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                fi
+
+            elif [ "$twofa_method" == "3" ]; then
+                twofa_method_name="Bluetooth Connection"
+                twofa_entry_name="Bluetooth Connection"
+                twofa_device_number=$(dialog --title "Z-NET Two-Factor Authentication System" --menu "You have selected to verify using a trusted bluetooth device\nThe following devices are available for use to verify your identity\nDevices that are marked as insecure will require an additional passcode to verify\nDevices marked as insecure are devices that could be publicly accessable\n\nWarning: If your device is set to use a random bluetooth mac address, verification will not work" 20 60 10 1 "Zena's DumbPhone (Secure) (38:8F:30:9D:AC:6E)" 2 "JLab Go Air (Insecure) (1C:52:16:82:EE:88)" 3 "Kitchen Portal (Insecure) (A4:0E:2B:5D:10:09)" --output-fd 1)
+                if [ "$twofa_device_number" == "1" ]; then
+                    twofa_device_name="Zena's DumbPhone"
+                    twofa_device_mac="38:8F:30:9D:AC:6E"
+                    twofa_device_security_level="Secure"
+                elif [ "$twofa_device_number" == "2" ]; then
+                    twofa_device_name="JLab Go Air"
+                    twofa_device_mac="1C:52:16:82:EE:88"
+                    twofa_device_security_level="Insecure"
+                elif [ "$twofa_device_number" == "3" ]; then
+                    twofa_device_name="Kitchen Portal"
+                    twofa_device_mac="A4:0E:2B:5D:10:09"
+                    twofa_device_security_level="Insecure"
+                fi
+                twofa_answer="$twofa_device_name"
+                if [ "$twofa_device_security_level" != "Secure" ]; then
+                    twofa_insecure_step1_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with an insecure bluetooth device\nPlease enter the devices name exactly as you saw it on the list" 12 60 --output-fd 1)
+                    if [ "$twofa_insecure_step1_answer" != "$twofa_device_name" ]; then
+                        twofa_insecure_verification="FAILED"
+                        dialog --title "Z-NET Two-Factor Authentication System" --msgbox "You failed to enter the correct device name\nTwo-Step Verification cannot countinue" 10 60
+                    fi
+                    if [ "$twofa_insecure_verification" != "FAILED" ]; then
+                        twofa_insecure_step2_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with an insecure bluetooth device\nPlease enter your MFA PIN" 12 60 --output-fd 1)
+                        if [ "$twofa_insecure_step2_answer" != "$twofa_insecure_pin" ]; then
+                            twofa_insecure_verification="FAILED"
+                            dialog --title "Z-NET Two-Factor Authentication System" --msgbox "You failed to enter the correct MFA PIN\nTwo-Step Verification cannot countinue" 10 60
+                        fi
+                    fi
+                    if [ "$twofa_insecure_verification" != "FAILED" ]; then
+                        twofa_insecure_verification="PASSED"
+                    fi
+                else
+                    twofa_insecure_verification="NOT REQUIRED"
+                fi
+                if [ "$twofa_insecure_verification" == "PASSED" ] || [ "$twofa_insecure_verification" == "NOT REQUIRED" ]; then
+                    dialog --title "Z-NET Two-Factor Authentication System" --msgbox "You have selected to verify using a Bluetooth Device\nPlease connect the device '$twofa_device_name' to your computer and hit ok." 7 60
+                    for i in {1..100}; do sleep 0.01; echo $i; done | dialog --title "Z-NET Two-Factor Authentication System" --gauge "Checking if the device is connected...\nPlease wait..." 7 60 0
+                    if [[ "$(bluetoothctl info $twofa_device_mac)" ==  *"Connected: yes"* ]]; then
+                        twofa_success="TRUE"
+                        echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                        /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                    fi
+                else
+                    twofa_success="FAILED"
+                fi
+
+            elif [ "$twofa_method" == "4" ]; then
+                twofa_method_name="Trusted USB Device"
+                twofa_entry_name="Trusted USB"
+                dialog --title "Z-NET Two-Factor Authentication System" --msgbox "You have selected to verify using a Trusted USB Device\nPlease connect the device 'Zena's USB' to your computer and hit ok" 7 60
+                for i in {1..100}; do sleep 0.01; echo $i; done | dialog --title "Z-NET Two-Factor Authentication System" --gauge "Checking if the device is connected...\nPlease wait..." 7 60 0
+                if [ "$(cat "/home/media/zcraftelite/Zena's USB/2fa.txt")" ==  "TRUE" ]; then
+                    twofa_success="TRUE"
+                    echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: Zena's USB" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                    /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                fi
+
+            elif [ "$twofa_method" == "5" ]; then
+                twofa_method_name="Text Message"
+                twofa_entry_name="MMS"
+                twofa_method_reciever="(757) 408-0814"
+                twofa_code="$(mintotp <<< ZENAASDNJKLMPONU)"
+                /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py verify "$twofa_code" "$ApplicationName" "7574080814@mypixmessages.com"
+                twofa_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with a Text Message\n\nPlease enter the code sent to $twofa_method_reciever" 12 60 --output-fd 1)
+                if [ "$twofa_answer" ==  "$twofa_code" ]; then
+                    twofa_success="TRUE"
+                    echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                    /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                fi
+
+            elif [ "$twofa_method" == "6" ]; then
+                twofa_method_name="Email"
+                twofa_entry_name="Email Message"
+                twofa_method_reciever="zcomer4dthesecond@gmail.com"
+                twofa_code="$(mintotp <<< ZENAASDNJKLMPONU)"
+                /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py verify "$twofa_code" "$ApplicationName" "zcomer4dthesecond@gmail.com"
+                twofa_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with a Email\n\nPlease enter the code sent to $twofa_method_reciever" 12 60 --output-fd 1)
+                if [ "$twofa_answer" ==  "$twofa_code" ]; then
+                    twofa_success="TRUE"
+                    echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                    /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                fi
+
+            elif [ "$twofa_method" == "7" ]; then
+                twofa_method_name="Email"
+                twofa_entry_name="Email Message"
+                twofa_method_reciever="ashtynwheeler101@gmail.com"
+                twofa_code="$(mintotp <<< ZENAASDNJKLMPONU)"
+                /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py verify "$twofa_code" "$ApplicationName" "ashtynwheeler101@gmail.com"
+                twofa_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with a Email\n\nPlease enter the code sent to $twofa_method_reciever" 12 60 --output-fd 1)
+                if [ "$twofa_answer" ==  "$twofa_code" ]; then
+                    twofa_success="TRUE"
+                    echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                    /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                fi
+
+            elif [ "$twofa_method" == "8" ]; then
+                dialog --title "Z-NET Two-Factor Authentication System" --msgbox "The method you selected, Fingerprint Scan, is not available for the following reasons:\nNo Fingerprint scanner connected or available.\nTry another method" 8 60
+                z-net protect bash
+
+            elif [ "$twofa_method" == "9" ]; then
+                dialog --title "Z-NET Two-Factor Authentication System" --msgbox "The method you selected, Face ID, is not available for the following reasons:\nConnected webcam does not have a high enough quality to be used for Face ID\nTry another method" 9 60
+                z-net protect bash
+            fi
+
+            if [ "$twofa_success" == "TRUE" ]; then
+                dialog --title "Z-NET Two-Factor Authentication System" --msgbox "Two-Step Verification was successful\nLogged at: $(date +'%m/%d/%y %l:%M %p')\nMethod Used: $twofa_method_name" 8 60
+                clear
+            else
+                dialog --title "Z-NET Two-Factor Authentication System" --msgbox "Two-Step Verification failed\nLogged at: $(date +'%m/%d/%y %l:%M %p')\nMethod Used: $twofa_method_name\n\nHit 'ok' to exit..." 10 60
+                echo "[$(date +'%m/%d/%y %l:%M %p')] $USER failed to authenticate $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py failure "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                exit 0
+            fi
+
+        else
+            dialog --title "Z-NET Two-Factor Authentication System" --msgbox "Two-Step Verification canceled\nLogged at: $(date +'%m/%d/%y %l:%M %p')\nMethod Used: N/A\n\nHit 'ok' to exit..." 10 60
+            echo "[$(date +'%m/%d/%y %l:%M %p')] $USER canceled authentication for $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+            /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py cancelation "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+            exit 1
+        fi
+
+    elif [ "$cmd_operator_1" == "bash" ]; then
+        ApplicationName="Linux Terminal System (bash)"
+        twofa_method=$(dialog --title "Z-NET Two-Factor Authentication System" --menu "This app ($ApplicationName) is protected by Z-NET\nPlease choose a Two-Step Verification Method Below\nAll Two-Step Verification Activity will be monitored" 19 60 10 1 "Use a TOTP Code from your Autehnticator App" 2 "Use a backup code" 3 "Use a trusted blueooth device" 4 "Use a Trusted USB Device" 5 "Text (757) 408-0814" 6 "Email zcomer4dthesecond@gmail.com" 7 "Email ashtynwheeler101@gmail.com" 8 "Scan your Fingerprint (Unavailable)" 9 "Use your Face ID (Unavailable)" --output-fd 1)
+        clear
+        twofa_state=$?
+        twofa_insecure_pin="091223"
+        if [ "$twofa_state" != "1" ]; then
+
+            if [ "$twofa_method" == "1" ]; then
+                twofa_method_name="TOTP Code"
+                twofa_entry_name="TOTP Code"
+                twofa_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with a TOTP Code from your Authenticator App\n\nPlease enter your TOTP Code" 12 60 --output-fd 1)
+                clear
+                if [ "$twofa_answer" = "$(mintotp <<< ZENAASDNJKLMPONU)" ]; then
+                    twofa_success="TRUE"
+                    echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                    /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                fi
+
+            elif [ "$twofa_method" == "2" ]; then
+                twofa_method_name="Backup Code"
+                twofa_entry_name="Backup Code"
+                twofa_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with a Backup Code\n\nPlease enter your Backup Code" 12 60 --output-fd 1)
+                if [ "$twofa_answer" = "B@ckupC0d3" ]; then
+                    length=${#twofa_answer}
+                    twofa_answer=$(printf '*%.0s' $(seq 1 $length))
+                    twofa_success="TRUE"
+                    sleep 2
+                    echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                    /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                fi
+
+            elif [ "$twofa_method" == "3" ]; then
+                twofa_method_name="Bluetooth Connection"
+                twofa_entry_name="Bluetooth Connection"
+                twofa_device_number=$(dialog --title "Z-NET Two-Factor Authentication System" --menu "You have selected to verify using a trusted bluetooth device\nThe following devices are available for use to verify your identity\nDevices that are marked as insecure will require an additional passcode to verify\nDevices marked as insecure are devices that could be publicly accessable\n\nWarning: If your device is set to use a random bluetooth mac address, verification will not work" 20 60 10 1 "Zena's DumbPhone (Secure) (38:8F:30:9D:AC:6E)" 2 "JLab Go Air (Insecure) (1C:52:16:82:EE:88)" 3 "Kitchen Portal (Insecure) (A4:0E:2B:5D:10:09)" --output-fd 1)
+                if [ "$twofa_device_number" == "1" ]; then
+                    twofa_device_name="Zena's DumbPhone"
+                    twofa_device_mac="38:8F:30:9D:AC:6E"
+                    twofa_device_security_level="Secure"
+                elif [ "$twofa_device_number" == "2" ]; then
+                    twofa_device_name="JLab Go Air"
+                    twofa_device_mac="1C:52:16:82:EE:88"
+                    twofa_device_security_level="Insecure"
+                elif [ "$twofa_device_number" == "3" ]; then
+                    twofa_device_name="Kitchen Portal"
+                    twofa_device_mac="A4:0E:2B:5D:10:09"
+                    twofa_device_security_level="Insecure"
+                fi
+                twofa_answer="$twofa_device_name"
+                if [ "$twofa_device_secuity_level" != "Secure" ]; then
+                    twofa_insecure_step1_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with an insecure bluetooth device\nPlease enter the devices name exactly as you saw it on the list" 12 60 --output-fd 1)
+                    if [ "$twofa_insecure_step1_answer" != "$twofa_device_name" ]; then
+                        twofa_insecure_verification="FAILED"
+                        dialog --title "Z-NET Two-Factor Authentication System" --msgbox "You failed to enter the correct device name\nTwo-Step Verification cannot countinue" 10 60
+                    fi
+                    if [ "$twofa_insecure_verification" != "FAILED" ]; then
+                        twofa_insecure_step2_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with an insecure bluetooth device\nPlease enter your MFA PIN" 12 60 --output-fd 1)
+                        if [ "$twofa_insecure_step2_answer" != "$twofa_insecure_pin" ]; then
+                            twofa_insecure_verification="FAILED"
+                            dialog --title "Z-NET Two-Factor Authentication System" --msgbox "You failed to enter the correct MFA PIN\nTwo-Step Verification cannot countinue" 10 60
+                        fi
+                    fi
+                    if [ "$twofa_insecure_verification" != "FAILED" ]; then
+                        twofa_insecure_verification="PASSED"
+                    fi
+                else
+                    twofa_insecure_verification="NOT REQUIRED"
+                fi
+                if [ "$twofa_insecure_verification" == "PASSED" ] || [ "$twofa_insecure_verification" == "NOT REQUIRED" ]; then
+                    dialog --title "Z-NET Two-Factor Authentication System" --msgbox "You have selected to verify using a Bluetooth Device\nPlease connect the device '$twofa_device_name' to your computer and hit ok." 7 60
+                    for i in {1..100}; do sleep 0.01; echo $i; done | dialog --title "Z-NET Two-Factor Authentication System" --gauge "Checking if the device is connected...\nPlease wait..." 7 60 0
+                    if [[ "$(bluetoothctl info $twofa_device_mac)" ==  *"Connected: yes"* ]]; then
+                        twofa_success="TRUE"
+                        echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                        /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                    fi
+                else
+                    twofa_success="FAILED"
+                fi
+
+            elif [ "$twofa_method" == "4" ]; then
+                twofa_method_name="Trusted USB Device"
+                twofa_entry_name="Trusted USB"
+                dialog --title "Z-NET Two-Factor Authentication System" --msgbox "You have selected to verify using a Trusted USB Device\nPlease connect the device 'Zena's USB' to your computer and hit ok" 7 60
+                for i in {1..100}; do sleep 0.01; echo $i; done | dialog --title "Z-NET Two-Factor Authentication System" --gauge "Checking if the device is connected...\nPlease wait..." 7 60 0
+                if [ "$(cat "/home/media/zcraftelite/Zena's USB/2fa.txt")" ==  "TRUE" ]; then
+                    twofa_success="TRUE"
+                    echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: Zena's USB" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                    /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                fi
+
+            elif [ "$twofa_method" == "5" ]; then
+                twofa_method_name="Text Message"
+                twofa_entry_name="MMS"
+                twofa_method_reciever="(757) 408-0814"
+                twofa_code="$(mintotp <<< ZENAASDNJKLMPONU)"
+                /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py verify "$twofa_code" "$ApplicationName" "7574080814@mypixmessages.com"
+                twofa_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with a Text Message\n\nPlease enter the code sent to $twofa_method_reciever" 12 60 --output-fd 1)
+                if [ "$twofa_answer" ==  "$twofa_code" ]; then
+                    twofa_success="TRUE"
+                    echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                    /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                fi
+
+            elif [ "$twofa_method" == "6" ]; then
+                twofa_method_name="Email"
+                twofa_entry_name="Email Message"
+                twofa_method_reciever="zcomer4dthesecond@gmail.com"
+                twofa_code="$(mintotp <<< ZENAASDNJKLMPONU)"
+                /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py verify "$twofa_code" "$ApplicationName" "zcomer4dthesecond@gmail.com"
+                twofa_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with a Email\n\nPlease enter the code sent to $twofa_method_reciever" 12 60 --output-fd 1)
+                if [ "$twofa_answer" ==  "$twofa_code" ]; then
+                    twofa_success="TRUE"
+                    echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                    /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                fi
+
+            elif [ "$twofa_method" == "7" ]; then
+                twofa_method_name="Email"
+                twofa_entry_name="Email Message"
+                twofa_method_reciever="ashtynwheeler101@gmail.com"
+                twofa_code="$(mintotp <<< ZENAASDNJKLMPONU)"
+                /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py verify "$twofa_code" "$ApplicationName" "ashtynwheeler101@gmail.com"
+                twofa_answer=$(dialog --title "Z-NET Two-Factor Authentication System" --inputbox "You have selected to verify with a Email\n\nPlease enter the code sent to $twofa_method_reciever" 12 60 --output-fd 1)
+                if [ "$twofa_answer" ==  "$twofa_code" ]; then
+                    twofa_success="TRUE"
+                    echo "[$(date +'%m/%d/%y %l:%M %p')] $USER authenticated $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                    /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py app "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                fi
+
+            elif [ "$twofa_method" == "8" ]; then
+                dialog --title "Z-NET Two-Factor Authentication System" --msgbox "The method you selected, Fingerprint Scan, is not available for the following reasons:\nNo Fingerprint scanner connected or available.\nTry another method" 8 60
+                z-net protect bash
+
+            elif [ "$twofa_method" == "9" ]; then
+                dialog --title "Z-NET Two-Factor Authentication System" --msgbox "The method you selected, Face ID, is not available for the following reasons:\nConnected webcam does not have a high enough quality to be used for Face ID\nTry another method" 9 60
+                z-net protect bash
+            fi
+
+            if [ "$twofa_success" == "TRUE" ]; then
+                dialog --title "Z-NET Two-Factor Authentication System" --msgbox "Two-Step Verification was successful\nLogged at: $(date +'%m/%d/%y %l:%M %p')\nMethod Used: $twofa_method_name" 8 60
+                clear
+            else
+                dialog --title "Z-NET Two-Factor Authentication System" --msgbox "Two-Step Verification failed\nLogged at: $(date +'%m/%d/%y %l:%M %p')\nMethod Used: $twofa_method_name\n\nHit 'ok' to exit terminal..." 10 60
+                echo "[$(date +'%m/%d/%y %l:%M %p')] $USER failed to authenticate $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+                /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py failure "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+                kill -9 $PPID
+            fi
+        
+        else
+            dialog --title "Z-NET Two-Factor Authentication System" --msgbox "Two-Step Verification canceled\nLogged at: $(date +'%m/%d/%y %l:%M %p')\nMethod Used: N/A\n\nHit 'ok' to exit terminal..." 10 60
+            echo "[$(date +'%m/%d/%y %l:%M %p')] $USER canceled authentication for $ApplicationName using $twofa_entry_name: $twofa_answer" >> '/home/zcraftelite/.config/Z-NET/netlog.log'
+            /home/zcraftelite/.config/Z-NET/MailClientService/API_2FA_WARNING.py cancelation "$USER" "$twofa_entry_name" "$twofa_answer" "$ApplicationName"
+            kill -9 $PPID
+        fi
+    fi
+
+}
+
+##- Shell
+
+## Process Finished Function
+# This is called at the end of all commands ran under the shell, it ensure that you reurn back to the shell after running the command
+function process-finished 
+{
+    if [ "$using_shell" == "TRUE" ]; then
+        z-net-shell
+    fi
+}
+
+## Ctrl + C Warning
+# Warns the user if they try to exit the shell using Ctrl + C
+function ctrl-c-warning
+{
+    echo
+    echo "Warning: Ctrl + C doesnt exit this shell, instead, try typing 'exit'"
+    process-finished
+}
+
+## Base Command Retriever
+# This function retrieves the base command
+function get-base-cmd
+{
+    base_cmd=$(echo "$selected_cmd" | sed 's/^\([^[:space:]]*\)[[:space:]].*/\1/')
+}
+
+## Shell Command Operator Set Function
+# This function is more complicated than the non-shell command operator function, but uses sed to get the command operators from the main command
+function set-shell-cmd-operators 
+{
+    cmd_operator_1="$(echo "$selected_cmd" | sed -n "s/$cmd[[:space:]]*\([^[:space:]]*\).*/\1/p")"
+    cmd_operator_2="$(echo "$selected_cmd" | sed -e "s/$cmd[[:space:]]*//" | sed -n "s/$cmd_operator_1[[:space:]]*\([^[:space:]]*\).*/\1/p")"
+    cmd_operator_3="$(echo "$selected_cmd" | sed -e "s/$cmd[[:space:]]*//" -e "s/$cmd_operator_1[[:space:]]*//" | sed -n "s/$cmd_operator_2[[:space:]]*\([^[:space:]]*\).*/\1/p")"
+}
+
+## Shell Command Operator Reset
+# This fnction resets the command operators to avoid the shell system getting confused
+function reset-cmd-operators
+{
+    cmd_operator_1=""
+    cmd_operator_2=""
+    cmd_operator_3=""
+}
+
+# Command Operator Reqired Warning
+# This function will appear when running a command that requires an command operator
+function require-cmd-operators
+{
+    if [ "$cmd_operator_1" == "" ]; then
+        echo "Whoops, that darn enter key :("
+        echo "The $cmd command requires an command operator"
+        echo "If you need help using the $cmd command, type 'help $cmd'"
+        process-finished
+    fi
+}
+
+## Shell function
+# Runs the shell interpreter
+function z-net-shell
+{
+    trap ctrl-c-warning SIGINT # Makes sure you cant accidentally press Ctrl + C and exit the shell
+    using_shell="TRUE" # Sets a variable to indicate the user is using the Z-NET Shell (Useful for running commands that require other data)
+    valid_command="" # Resets the valid_command variables
+    reset-cmd-operators
+
+    if [ "$clear_shell_next_reload" == "TRUE" ]; then # Clears the shell if the user ran the clear command or ran another command that prompts for the shell to be cleared
+        clear_shell_next_reload="FALSE"
+        clear
+    fi
+
+    if [ "$new_shell_instance" == "TRUE" ]; then # Runs the introductory code if this is a new instance of the shell
+        new_shell_instance="FALSE"
+        protect_self="TRUE"
+        protect
+        clear
+        echo -e "Z-NET $Program_Version Shell"
+        echo -e "--------------------------------"
+        echo -e "If you didnt mean to get here, dont worry, just type 'exit'"
+        echo -e "If you wanna explore commands, type 'help'"
+    fi
+
+    read -p "Z-NET>>>" selected_cmd # Main prompt for shell
+
+    for cmd in "${cmd_list[@]}"; do # Checks to see if you ran a valid command from the list
+        get-base-cmd
+        if [ "$base_cmd" == "$cmd" ]; then
+            valid_command="found"
+            echo "Placeholder for $cmd Command"
+            if [ $cmd == "auth" ]; then
+                "cmd-$base_cmd"
+            fi
+            process-finished
+        fi
+    done
+
+    if [ "valid_command" != "found" ]; then # If you didnt run a valid command from the list, checks to see if you ran a command usually only available in shell
+        if [ "$selected_cmd" == "exit" ]; then
+            using_shell="FALSE"
+            clear
+            echo "Exited Z-NET Shell"
+            exit 0
+        elif [ "$selected_cmd" == "clear" ]; then
+            clear_shell_next_reload="TRUE"
+            process-finished
+        elif [ "$selected_cmd" == "" ]; then
+            echo "Whoops, that darn enter key :("
+            echo "It looks like you forgot to type a command"
+            echo "If you need help finding a command, type 'help'"
+            process-finished
+        else
+            echo "I have no idea what your talking about :/"
+            echo "It looks like you typed an invalid command"
+            echo "Check your spelling and try again"
+            echo "If you need help finding a command, type 'help'"
+            process-finished
+        fi
+    fi
+}
+
+##- Main
+
+## Root Detection Function
+# Used to detect if the z-net executable is run as root, to ensure proper results within the program
+function rootdetect
+{
+    if [ "$(id -u)" != "0" ]
+        then
+            dialog --title "Z-NET Sudo Verification System" --msgbox "In order to complete this operation, Z-NET must be run as root.\nPlease run Z-NET as root using;\n\nsudo z-net update" 9 60
+            clear
+            exit 1
+    fi
+}
+
+## Invalid Command Warning
+# Appears when the user types an invalid command
+function invalid-cmd-warning
+{
+    echo "Oops :(, The command you tried to enter was not found, please try again."
+}
+
+## Auth Command
+# Command that manages Z-NET's authorization system
+function cmd-auth
+{
+    # Sets command operators
+    if [ "$using_shell" == "TRUE" ]; then 
+        set-shell-cmd-operators
+    fi
+
+    echo "$2"
+    require-cmd-operators
+
+    if [ "$cmd_operator_1" = "log" ]; then
+
+        if [ "$cmd_operator_2" != "" ]; then
+
+            if [ "$cmd_operator_2" = "clear" ]; then
+                echo "" > "/home/zcraftelite/.config/Z-NET/netlog.log"
+                echo "Successfully cleared Authentication Log"
+                process-finished
+            fi
+
+        else
+
+            clear_shell_next_reload="TRUE"
+            echo "Loading Authentication Log..."
+            sleep 2
+            clear
+            more "/home/zcraftelite/.config/Z-NET/netlog.log"
+            read -p "Press enter when finished"
+            process-finished
+
+        fi
+
+    fi
+}
+
+### Main Command Interpretation
+
+## Command Detection Loop
+# Checks data to see what command you are trying to run
+if [ "$1" == "protect" ]; then
+    valid_command="found"
+    cmd_operator_1=$2
+    cmd_operator_2=$3
+    cmd_operator_3=$4
+    protect
+fi
+
+for cmd in "${cmd_list[@]}"; do # Checks to see if the command you typed is equal to any of the valid commands
+    if [ "$1" == "$cmd" ]; then
+        selected_cmd="$1"
+        get-base-cmd
+        cmd_operator_1=$2
+        cmd_operator_2=$3
+        cmd_operator_3=$4
+        valid_command="found"
+        "cmd-$base_cmd"
+    fi
+done
+
+if [ "$valid_command" != "found" ]; then # Sees if the previous check found a valid command
+    if [ "$1" == "" ] || [ "$1" == "shell" ]; then # If it didnt, it checks to see if you were trying to enter the shell
+        new_shell_instance="TRUE"
+        z-net-shell
+    else # Otherwise, it shows you the invalid command warning
+        invalid-cmd-warning
+    fi
+fi
